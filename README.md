@@ -257,6 +257,6 @@ This server executes commands directly in PowerShell. Use with caution and only 
 3. **Verify Node.js installation** and path
 
 ## License
+ISC 
 ## Author
 Girish Prasad Sahu
-ISC 
