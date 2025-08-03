@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mcpshell": {
+      "command": "node",
+      "args": ["index.js"],
+      "cwd": "D:\\AI\\MCPShell",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+} 
