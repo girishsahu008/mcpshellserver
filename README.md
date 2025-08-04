@@ -1,11 +1,12 @@
 # MCP Shell Server
 
-A Model Context Protocol (MCP) server that provides both local Windows PowerShell commands and remote SSH Linux command execution capabilities.
+A Model Context Protocol (MCP) server that provides both local Windows PowerShell commands and remote SSH Linux command execution capabilities with support for both password and PEM key authentication.
 
 ## Features
 
 - **Local PowerShell Tool**: Execute Windows PowerShell commands locally
 - **SSH Remote Tool**: Execute Linux commands on remote servers via SSH
+- **Dual Authentication**: Support for both password and PEM key authentication
 - **Server Management**: List and manage multiple SSH server connections
 - **Simple Configuration**: JSON-based server configuration
 - **ES Module Support**: Modern JavaScript implementation
@@ -84,7 +85,7 @@ The SSH server exposes two tools for remote server management:
 
 #### 1. executeSSHCommand
 
-Execute Linux commands on remote servers via SSH.
+Execute Linux commands on remote servers via SSH with support for both password and PEM key authentication.
 
 **Parameters:**
 - `serverName` (string, required): Name of the server (as defined in servers.json)
@@ -113,7 +114,7 @@ Execute Linux commands on remote servers via SSH.
 
 #### 2. listServers
 
-List all available servers from the configuration.
+List all available servers from the configuration with authentication methods.
 
 **Parameters:** None
 
@@ -134,6 +135,7 @@ List all available servers from the configuration.
 
 Configure your SSH servers in `servers.json`:
 
+#### Password Authentication
 ```json
 {
   "servers": [
@@ -143,13 +145,22 @@ Configure your SSH servers in `servers.json`:
       "port": 22,
       "username": "ubuntu",
       "password": "your_password_here"
-    },
+    }
+  ]
+}
+```
+
+#### PEM Key Authentication
+```json
+{
+  "servers": [
     {
-      "name": "dbserver1",
-      "host": "192.168.1.101",
+      "name": "prod-server1",
+      "host": "192.168.1.102",
       "port": 22,
       "username": "ubuntu",
-      "password": "your_password_here"
+      "privateKeyPath": "./keys/prod-server1.pem",
+      "passphrase": "optional_passphrase_if_key_is_encrypted"
     }
   ]
 }
@@ -160,7 +171,27 @@ Configure your SSH servers in `servers.json`:
 - `host`: Server IP address or hostname
 - `port`: SSH port (usually 22)
 - `username`: SSH username
-- `password`: SSH password
+- `password`: SSH password (for password authentication)
+- `privateKeyPath`: Path to PEM private key file (for key authentication)
+- `passphrase`: Optional passphrase for encrypted private keys
+
+### SSH Key Setup
+
+1. **Create keys directory:**
+```bash
+mkdir keys
+```
+
+2. **Place your PEM key files** in the `keys/` directory
+
+3. **Set proper permissions** (Linux/macOS):
+```bash
+chmod 600 keys/*.pem
+```
+
+4. **Update `servers.json`** with the correct key file paths
+
+5. **Add keys to `.gitignore`** (already configured)
 
 ## MCP Configuration
 
@@ -236,11 +267,18 @@ To use both servers with Claude Desktop:
 This server executes commands directly in PowerShell. Use with caution and only in trusted environments.
 
 ### SSH Remote Server
-- Store server credentials securely
-- Use strong passwords
-- Consider using SSH keys instead of passwords for production
-- Ensure SSH is properly configured on target servers
-- Monitor server access logs
+- **PEM Key Authentication** (Recommended for production):
+  - Store private keys securely in the `keys/` directory
+  - Set proper file permissions (600)
+  - Use encrypted keys with passphrases
+  - Never commit keys to version control
+- **Password Authentication**:
+  - Use strong passwords
+  - Consider migrating to key-based authentication
+- **General Security**:
+  - Ensure SSH is properly configured on target servers
+  - Monitor server access logs
+  - Limit server access to necessary users only
 
 ## Troubleshooting
 
@@ -251,12 +289,20 @@ This server executes commands directly in PowerShell. Use with caution and only 
 4. **Check firewall settings** on target servers
 5. **Verify username/password** are correct
 
+### PEM Key Issues
+1. **Check key file path** in `servers.json`
+2. **Verify key file permissions** (should be 600)
+3. **Ensure key file exists** in the specified location
+4. **Check key format** (should be PEM format)
+5. **Verify passphrase** if key is encrypted
+
 ### Local Server Issues
 1. **Ensure PowerShell is available** on Windows
 2. **Check execution policy** if commands are blocked
 3. **Verify Node.js installation** and path
 
 ## License
+
 ## Author
 Girish Prasad Sahu
 ISC 

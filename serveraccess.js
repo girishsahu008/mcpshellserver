@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Client } from 'ssh2';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -21,7 +21,19 @@ try {
   serverConfigs = [];
 }
 
-// SSH connection function
+// Function to read PEM key file
+function readPEMKey(keyPath) {
+  try {
+    if (!existsSync(keyPath)) {
+      throw new Error(`PEM key file not found: ${keyPath}`);
+    }
+    return readFileSync(keyPath, 'utf8');
+  } catch (error) {
+    throw new Error(`Failed to read PEM key file: ${error.message}`);
+  }
+}
+
+// SSH connection function with support for both password and PEM key authentication
 async function executeSSHCommand(serverName, command) {
   const serverConfig = serverConfigs.find(s => s.name === serverName);
   
@@ -60,14 +72,45 @@ async function executeSSHCommand(serverName, command) {
       });
     }).on('error', (err) => {
       reject(new Error(`SSH connection failed: ${err.message}`));
-    }).connect({
+    });
+
+    // Prepare connection options
+    const connectionOptions = {
       host: serverConfig.host,
-      port: serverConfig.port,
+      port: serverConfig.port || 22,
       username: serverConfig.username,
-      password: serverConfig.password,
       readyTimeout: 10000,
       keepaliveInterval: 1000
-    });
+    };
+
+    // Determine authentication method
+    if (serverConfig.privateKeyPath) {
+      // Use PEM key authentication
+      try {
+        const privateKey = readPEMKey(serverConfig.privateKeyPath);
+        connectionOptions.privateKey = privateKey;
+        
+        // Optional: Add passphrase if the key is encrypted
+        if (serverConfig.passphrase) {
+          connectionOptions.passphrase = serverConfig.passphrase;
+        }
+        
+        console.error(`Using PEM key authentication for ${serverName}`);
+      } catch (error) {
+        reject(new Error(`PEM key authentication failed: ${error.message}`));
+        return;
+      }
+    } else if (serverConfig.password) {
+      // Use password authentication
+      connectionOptions.password = serverConfig.password;
+      console.error(`Using password authentication for ${serverName}`);
+    } else {
+      reject(new Error(`No authentication method specified for server ${serverName}. Please provide either 'password' or 'privateKeyPath'`));
+      return;
+    }
+
+    // Connect using the determined authentication method
+    conn.connect(connectionOptions);
   });
 }
 
@@ -133,7 +176,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       name: s.name,
       host: s.host,
       port: s.port,
-      username: s.username
+      username: s.username,
+      authMethod: s.privateKeyPath ? 'PEM Key' : 'Password'
     }));
 
     return {
@@ -155,7 +199,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'executeSSHCommand',
-        description: 'Execute a Linux command on a remote server via SSH',
+        description: 'Execute a Linux command on a remote server via SSH (supports password and PEM key authentication)',
         inputSchema: {
           type: 'object',
           properties: {
@@ -173,7 +217,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'listServers',
-        description: 'List all available servers from the configuration',
+        description: 'List all available servers from the configuration with authentication methods',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -188,4 +232,4 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.error('MCP SSH Shell server started');
+console.error('MCP SSH Shell server started with PEM key support');
